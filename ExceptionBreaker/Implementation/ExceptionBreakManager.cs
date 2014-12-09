@@ -15,6 +15,13 @@ namespace ExceptionBreaker.Implementation {
         // the constants below seem to work well enough, but I would not be surprised if
         // there is something I have not noticed
 
+        // exceptions that will not be affected by pressing 'Break on all CLR exceptions' button
+        private readonly HashSet<string> ignored = new HashSet<string>
+        {
+            "System.IO.DirectoryNotFoundException",
+            "System.OperationCanceledException"
+        };
+
         private const enum_EXCEPTION_STATE VSExceptionStateStopAll =
             enum_EXCEPTION_STATE.EXCEPTION_STOP_FIRST_CHANCE
           | enum_EXCEPTION_STATE.EXCEPTION_STOP_SECOND_CHANCE
@@ -169,6 +176,12 @@ namespace ExceptionBreaker.Implementation {
             var exceptionThatCausedChangeFromUnknown = new EXCEPTION_INFO();
 
             foreach (var exception in GetSetManagedExceptions()) {
+                if (ignored.Contains(exception.bstrExceptionName))
+                {
+                    // ignore state while showing aggregated status
+                    continue;
+                }
+
                 var @break = (((enum_EXCEPTION_STATE)exception.dwState & VSExceptionStateStopAllInfer) == VSExceptionStateStopAllInfer);
                 var stateFromException = @break ? ExceptionBreakState.BreakOnAll : ExceptionBreakState.BreakOnNone;
 
@@ -210,6 +223,13 @@ namespace ExceptionBreaker.Implementation {
 
             var updated = new EXCEPTION_INFO[1];
             foreach (var exception in this.exceptionCache) {
+                if (ignored.Contains(exception.bstrExceptionName) &&
+                    state == ExceptionBreakState.BreakOnAll)
+                {
+                    // don't turn on break on such exceptions
+                    continue;
+                }
+
                 updated[0] = new EXCEPTION_INFO {
                     guidType = exception.guidType,
                     bstrExceptionName = exception.bstrExceptionName,
